@@ -1,0 +1,2 @@
+# Medicine-Stock-and-Expiry-Management-for-a-Community-Health-Centre
+This C program evaluates medicine stock for a health centre by calculating stock duration, checking for shortages or expiry risks, and assigning management priorities to six medicines. It executes sequentially without a menu. Following course constraints, it uses 1D/2D arrays, loops, pointers and enums, but avoids both structures and file I/O.
