@@ -1,697 +1,541 @@
-#include <stdio.h> 
+#include <stdio.h>
 
-#include <string.h> 
+#include <string.h>
 
-  
+#define MEDICINE_COUNT 6
 
-#define MEDICINE_COUNT 6 
+#define CODE_LENGTH 10
 
-#define CODE_LENGTH 10 
+#define NAME_LENGTH 30
 
-#define NAME_LENGTH 30 
+#define SHORTAGE_DAYS 7
 
-#define SHORTAGE_DAYS 7 
+#define EXPIRY_DAYS 30
 
-#define EXPIRY_DAYS 30 
+enum
+{
 
-  
+    AVAILABLE_STOCK,
 
-enum { 
+    DAILY_REQUIREMENT,
 
-    AVAILABLE_STOCK, 
+    MINIMUM_STOCK,
 
-    DAILY_REQUIREMENT, 
+    DAYS_TO_EXPIRY,
 
-    MINIMUM_STOCK, 
+    ESSENTIALITY
 
-    DAYS_TO_EXPIRY, 
+};
 
-    ESSENTIALITY 
+char medicineCode[MEDICINE_COUNT][CODE_LENGTH] = {
 
-}; 
+    "MED01", "MED02", "MED03", "MED04", "MED05", "MED06"
 
-  
+};
 
-char medicineCode[MEDICINE_COUNT][CODE_LENGTH] = { 
+char medicineName[MEDICINE_COUNT][NAME_LENGTH] = {
 
-    "MED01", "MED02", "MED03", "MED04", "MED05", "MED06" 
+    "Oral Saline", "Paracetamol", "Insulin",
 
-}; 
+    "Amoxicillin", "Antacid", "Cetirizine"
 
-  
+};
 
-char medicineName[MEDICINE_COUNT][NAME_LENGTH] = { 
+/* Each row contains:
 
-    "Oral Saline", "Paracetamol", "Insulin", 
+   [0] available stock
 
-    "Amoxicillin", "Antacid", "Cetirizine" 
+   [1] average daily requirement
 
-}; 
+   [2] minimum stock level
 
-  
+   [3] days remaining to expiry
 
-/* Each row contains: 
+   [4] essentiality level
 
-   [0] available stock 
+*/
 
-   [1] average daily requirement 
+int medicineData[MEDICINE_COUNT][5] = {
 
-   [2] minimum stock level 
+    {120, 35, 80, 45, 3},
 
-   [3] days remaining to expiry 
+    {300, 40, 100, 120, 2},
 
-   [4] essentiality level 
+    {60, 12, 50, 30, 3},
 
-*/ 
+    {200, 25, 80, 20, 3},
 
-int medicineData[MEDICINE_COUNT][5] = { 
+    {250, 18, 60, 15, 1},
 
-    {120, 35, 80, 45, 3}, 
+    {180, 15, 50, 90, 1}
 
-    {300, 40, 100, 120, 2}, 
+};
 
-    {60, 12, 50, 30, 3}, 
+double calculateCoverage(int index)
 
-    {200, 25, 80, 20, 3}, 
+{
 
-    {250, 18, 60, 15, 1}, 
+    if (medicineData[index][DAILY_REQUIREMENT] <= 0)
 
-    {180, 15, 50, 90, 1} 
+        return 0.0;
 
-}; 
+    return (double)medicineData[index][AVAILABLE_STOCK] /
 
-  
+           medicineData[index][DAILY_REQUIREMENT];
+}
 
-double calculateCoverage(int index) 
+int shortageRisk(int index)
 
-{ 
+{
 
-    if (medicineData[index][DAILY_REQUIREMENT] <= 0) 
+    double coverage = calculateCoverage(index);
 
-        return 0.0; 
+    if (medicineData[index][AVAILABLE_STOCK] <
 
-  
+            medicineData[index][MINIMUM_STOCK] ||
 
-    return (double)medicineData[index][AVAILABLE_STOCK] / 
+        coverage < SHORTAGE_DAYS)
 
-           medicineData[index][DAILY_REQUIREMENT]; 
+        return 1;
 
-} 
+    return 0;
+}
 
-  
+int expiryRisk(int index)
 
-int shortageRisk(int index) 
+{
 
-{ 
+    double coverage = calculateCoverage(index);
 
-    double coverage = calculateCoverage(index); 
+    if (medicineData[index][DAYS_TO_EXPIRY] <= EXPIRY_DAYS ||
 
-  
+        medicineData[index][DAYS_TO_EXPIRY] <= coverage)
 
-    if (medicineData[index][AVAILABLE_STOCK] < 
+        return 1;
 
-            medicineData[index][MINIMUM_STOCK] || 
+    return 0;
+}
 
-        coverage < SHORTAGE_DAYS) 
+/*
 
-        return 1; 
+    Condition severity:
 
-  
+    1 = Critical Condition
 
-    return 0; 
+    2 = Urgent Reorder
 
-} 
+    3 = Reorder Required
 
-  
+    4 = Expiry Attention
 
-int expiryRisk(int index) 
+    5 = Sufficient Stock
 
-{ 
+*/
 
-    double coverage = calculateCoverage(index); 
+int conditionSeverity(int index)
 
-  
+{
 
-    if (medicineData[index][DAYS_TO_EXPIRY] <= EXPIRY_DAYS || 
+    int shortage = shortageRisk(index);
 
-        medicineData[index][DAYS_TO_EXPIRY] <= coverage) 
+    int expiry = expiryRisk(index);
 
-        return 1; 
+    if (shortage && expiry)
 
-  
+        return 1;
 
-    return 0; 
+    if (shortage)
 
-} 
+    {
 
-  
+        if (medicineData[index][ESSENTIALITY] == 3)
 
-/* 
+            return 2;
 
-    Condition severity: 
+        return 3;
+    }
 
-    1 = Critical Condition 
+    if (expiry)
 
-    2 = Urgent Reorder 
+        return 4;
 
-    3 = Reorder Required 
+    return 5;
+}
 
-    4 = Expiry Attention 
+const char *getCondition(int index)
 
-    5 = Sufficient Stock 
+{
 
-*/ 
+    int severity = conditionSeverity(index);
 
-int conditionSeverity(int index) 
+    if (severity == 1)
 
-{ 
+        return "Critical Condition";
 
-    int shortage = shortageRisk(index); 
+    else if (severity == 2)
 
-    int expiry = expiryRisk(index); 
+        return "Urgent Reorder";
 
-  
+    else if (severity == 3)
 
-    if (shortage && expiry) 
+        return "Reorder Required";
 
-        return 1; 
+    else if (severity == 4)
 
-  
+        return "Expiry Attention";
 
-    if (shortage) 
+    return "Sufficient Stock";
+}
 
-    { 
+/*
 
-        if (medicineData[index][ESSENTIALITY] == 3) 
+    Returns 1 when the first medicine should appear before
 
-            return 2; 
+    the second medicine in the final priority order.
 
-  
+*/
 
-        return 3; 
+int comparePriority(int first, int second)
 
-    } 
+{
 
-  
+    int firstSeverity = conditionSeverity(first);
 
-    if (expiry) 
+    int secondSeverity = conditionSeverity(second);
 
-        return 4; 
+    /* 1. Higher essentiality level */
 
-  
+    if (medicineData[first][ESSENTIALITY] !=
 
-    return 5; 
+        medicineData[second][ESSENTIALITY])
 
-} 
+    {
 
-  
+        return medicineData[first][ESSENTIALITY] >
 
-const char *getCondition(int index) 
+               medicineData[second][ESSENTIALITY];
+    }
 
-{ 
+    /* 2. More severe condition */
 
-    int severity = conditionSeverity(index); 
+    if (firstSeverity != secondSeverity)
 
-  
+        return firstSeverity < secondSeverity;
 
-    if (severity == 1) 
+    /* 3. Lower stock coverage */
 
-        return "Critical Condition"; 
+    if (calculateCoverage(first) != calculateCoverage(second))
 
-    else if (severity == 2) 
+        return calculateCoverage(first) < calculateCoverage(second);
 
-        return "Urgent Reorder"; 
+    /* 4. Earlier expiry */
 
-    else if (severity == 3) 
+    if (medicineData[first][DAYS_TO_EXPIRY] !=
 
-        return "Reorder Required"; 
+        medicineData[second][DAYS_TO_EXPIRY])
 
-    else if (severity == 4) 
+    {
 
-        return "Expiry Attention"; 
+        return medicineData[first][DAYS_TO_EXPIRY] <
 
-  
+               medicineData[second][DAYS_TO_EXPIRY];
+    }
 
-    return "Sufficient Stock"; 
+    /* 5. Original order */
 
-} 
+    return first < second;
+}
 
-  
+void sortMedicineIndexes(int order[])
 
-/* 
+{
 
-    Returns 1 when the first medicine should appear before 
+    int i, j, temp;
 
-    the second medicine in the final priority order. 
+    for (i = 0; i < MEDICINE_COUNT - 1; i++)
 
-*/ 
+    {
 
-int comparePriority(int first, int second) 
+        for (j = 0; j < MEDICINE_COUNT - 1 - i; j++)
 
-{ 
+        {
 
-    int firstSeverity = conditionSeverity(first); 
+            if (!comparePriority(order[j], order[j + 1]))
 
-    int secondSeverity = conditionSeverity(second); 
+            {
 
-  
+                temp = order[j];
 
-    /* 1. Higher essentiality level */ 
+                order[j] = order[j + 1];
 
-    if (medicineData[first][ESSENTIALITY] != 
+                order[j + 1] = temp;
+            }
+        }
+    }
+}
 
-        medicineData[second][ESSENTIALITY]) 
+int searchMedicine(const char searchCode[])
 
-    { 
+{
 
-        return medicineData[first][ESSENTIALITY] > 
+    int i;
 
-               medicineData[second][ESSENTIALITY]; 
+    for (i = 0; i < MEDICINE_COUNT; i++)
 
-    } 
+    {
 
-  
+        if (strcmp(medicineCode[i], searchCode) == 0)
 
-    /* 2. More severe condition */ 
+            return i;
+    }
 
-    if (firstSeverity != secondSeverity) 
+    return -1;
+}
 
-        return firstSeverity < secondSeverity; 
+void displayMedicine(int index)
 
-  
+{
 
-    /* 3. Lower stock coverage */ 
+    printf("\nMedicine Code        : %s\n", medicineCode[index]);
 
-    if (calculateCoverage(first) != calculateCoverage(second)) 
+    printf("Medicine Name        : %s\n", medicineName[index]);
 
-        return calculateCoverage(first) < calculateCoverage(second); 
+    printf("Available Stock      : %d\n",
 
-  
+           medicineData[index][AVAILABLE_STOCK]);
 
-    /* 4. Earlier expiry */ 
+    printf("Daily Requirement    : %d\n",
 
-    if (medicineData[first][DAYS_TO_EXPIRY] != 
+           medicineData[index][DAILY_REQUIREMENT]);
 
-        medicineData[second][DAYS_TO_EXPIRY]) 
+    printf("Minimum Stock        : %d\n",
 
-    { 
+           medicineData[index][MINIMUM_STOCK]);
 
-        return medicineData[first][DAYS_TO_EXPIRY] < 
+    printf("Days to Expiry       : %d\n",
 
-               medicineData[second][DAYS_TO_EXPIRY]; 
+           medicineData[index][DAYS_TO_EXPIRY]);
 
-    } 
+    printf("Essentiality Level   : %d\n",
 
-  
+           medicineData[index][ESSENTIALITY]);
 
-    /* 5. Original order */ 
+    printf("Stock Coverage       : %.2f days\n",
 
-    return first < second; 
+           calculateCoverage(index));
 
-} 
+    printf("Shortage Risk        : %s\n",
 
-  
+           shortageRisk(index) ? "Yes" : "No");
 
-void sortMedicineIndexes(int order[]) 
+    printf("Expiry Risk          : %s\n",
 
-{ 
+           expiryRisk(index) ? "Yes" : "No");
 
-    int i, j, temp; 
+    printf("Stock Condition      : %s\n",
 
-  
+           getCondition(index));
+}
 
-    for (i = 0; i < MEDICINE_COUNT - 1; i++) 
+int receiveStock(int *stock, int quantity)
 
-    { 
+{
 
-        for (j = 0; j < MEDICINE_COUNT - 1 - i; j++) 
+    if (quantity <= 0)
 
-        { 
+        return 0;
 
-            if (!comparePriority(order[j], order[j + 1])) 
+    *stock = *stock + quantity;
 
-            { 
+    return 1;
+}
 
-                temp = order[j]; 
+int issueStock(int *stock, int quantity)
 
-                order[j] = order[j + 1]; 
+{
 
-                order[j + 1] = temp; 
+    if (quantity <= 0 || quantity > *stock)
 
-            } 
+        return 0;
 
-        } 
+    *stock = *stock - quantity;
 
-    } 
+    return 1;
+}
 
-} 
+void demonstrateSearch(const char searchCode[])
 
-  
+{
 
-int searchMedicine(const char searchCode[]) 
+    int index = searchMedicine(searchCode);
 
-{ 
+    printf("\n================ STOCK SEARCH ================\n");
 
-    int i; 
+    printf("Search code: %s\n", searchCode);
 
-  
+    if (index == -1)
 
-    for (i = 0; i < MEDICINE_COUNT; i++) 
+        printf("Medicine not found.\n");
 
-    { 
+    else
 
-        if (strcmp(medicineCode[i], searchCode) == 0) 
+        displayMedicine(index);
+}
 
-            return i; 
+void demonstrateUpdates(void)
 
-    } 
+{
 
-  
+    int index;
 
-    return -1; 
+    printf("\n================ STOCK UPDATE ================\n");
 
-} 
+    index = searchMedicine("MED02");
 
-  
+    if (index != -1)
 
-void displayMedicine(int index) 
+    {
 
-{ 
+        if (receiveStock(&medicineData[index][AVAILABLE_STOCK], 50))
 
-    printf("\nMedicine Code        : %s\n", medicineCode[index]); 
+        {
 
-    printf("Medicine Name        : %s\n", medicineName[index]); 
+            printf("Received 50 units of %s.\n", medicineName[index]);
 
-    printf("Available Stock      : %d\n", 
+            printf("New stock: %d\n",
 
-           medicineData[index][AVAILABLE_STOCK]); 
+                   medicineData[index][AVAILABLE_STOCK]);
 
-    printf("Daily Requirement    : %d\n", 
+            printf("Updated condition: %s\n", getCondition(index));
+        }
+    }
 
-           medicineData[index][DAILY_REQUIREMENT]); 
+    index = searchMedicine("MED05");
 
-    printf("Minimum Stock        : %d\n", 
+    if (index != -1)
 
-           medicineData[index][MINIMUM_STOCK]); 
+    {
 
-    printf("Days to Expiry       : %d\n", 
+        if (issueStock(&medicineData[index][AVAILABLE_STOCK], 40))
 
-           medicineData[index][DAYS_TO_EXPIRY]); 
+        {
 
-    printf("Essentiality Level   : %d\n", 
+            printf("Issued 40 units of %s.\n", medicineName[index]);
 
-           medicineData[index][ESSENTIALITY]); 
+            printf("New stock: %d\n",
 
-    printf("Stock Coverage       : %.2f days\n", 
+                   medicineData[index][AVAILABLE_STOCK]);
 
-           calculateCoverage(index)); 
+            printf("Updated condition: %s\n", getCondition(index));
+        }
+    }
+}
 
-    printf("Shortage Risk        : %s\n", 
+void displayFinalReport(int order[])
 
-           shortageRisk(index) ? "Yes" : "No"); 
+{
 
-    printf("Expiry Risk          : %s\n", 
+    int i, index;
 
-           expiryRisk(index) ? "Yes" : "No"); 
+    int reorderCount = 0;
 
-    printf("Stock Condition      : %s\n", 
+    int urgentCount = 0;
 
-           getCondition(index)); 
+    int expiryCount = 0;
 
-} 
+    printf("\n\n================ FINAL STOCK REPORT ================\n");
 
-  
+    printf("%-6s %-15s %-7s %-10s %-7s %-5s %-20s %-8s\n",
 
-int receiveStock(int *stock, int quantity) 
+           "Code", "Medicine", "Stock", "Coverage",
 
-{ 
+           "Expiry", "Ess.", "Condition", "Priority");
 
-    if (quantity <= 0) 
+    for (i = 0; i < MEDICINE_COUNT; i++)
 
-        return 0; 
+    {
 
-  
+        index = order[i];
 
-    *stock = *stock + quantity; 
+        printf("%-6s %-15s %-7d %-10.2f %-7d %-5d %-20s %-8d\n",
 
-    return 1; 
+               medicineCode[index],
 
-} 
+               medicineName[index],
 
-  
+               medicineData[index][AVAILABLE_STOCK],
 
-int issueStock(int *stock, int quantity) 
+               calculateCoverage(index),
 
-{ 
+               medicineData[index][DAYS_TO_EXPIRY],
 
-    if (quantity <= 0 || quantity > *stock) 
+               medicineData[index][ESSENTIALITY],
 
-        return 0; 
+               getCondition(index),
 
-  
+               i + 1);
 
-    *stock = *stock - quantity; 
+        if (shortageRisk(index))
 
-    return 1; 
+            reorderCount++;
 
-} 
+        if (conditionSeverity(index) == 1 ||
 
-  
+            conditionSeverity(index) == 2)
 
-void demonstrateSearch(const char searchCode[]) 
+            urgentCount++;
 
-{ 
+        if (expiryRisk(index))
 
-    int index = searchMedicine(searchCode); 
+            expiryCount++;
+    }
 
-  
+    printf("\nSummary\n");
 
-    printf("\n================ STOCK SEARCH ================\n"); 
+    printf("Total medicines analysed       : %d\n", MEDICINE_COUNT);
 
-    printf("Search code: %s\n", searchCode); 
+    printf("Number requiring reorder       : %d\n", reorderCount);
 
-  
+    printf("Number requiring urgent action : %d\n", urgentCount);
 
-    if (index == -1) 
+    printf("Number with expiry concern     : %d\n", expiryCount);
 
-        printf("Medicine not found.\n"); 
+    printf("Highest management priority    : %s (%s)\n",
 
-    else 
+           medicineName[order[0]], medicineCode[order[0]]);
+}
 
-        displayMedicine(index); 
+int main(void)
 
-} 
+{
 
-  
+    int order[MEDICINE_COUNT];
 
-void demonstrateUpdates(void) 
+    int i;
 
-{ 
+    for (i = 0; i < MEDICINE_COUNT; i++)
 
-    int index; 
+        order[i] = i;
 
-  
+    printf("MEDICINE STOCK AND EXPIRY MANAGEMENT\n");
 
-    printf("\n================ STOCK UPDATE ================\n"); 
+    printf("Community Health Centre\n");
 
-  
+    printf("\n================ INITIAL ANALYSIS ================\n");
 
-    index = searchMedicine("MED02"); 
+    for (i = 0; i < MEDICINE_COUNT; i++)
 
-  
+        displayMedicine(i);
 
-    if (index != -1) 
+    demonstrateSearch("MED03");
 
-    { 
+    demonstrateSearch("MED99");
 
-        if (receiveStock(&medicineData[index][AVAILABLE_STOCK], 50)) 
+    demonstrateUpdates();
 
-        { 
+    sortMedicineIndexes(order);
 
-            printf("Received 50 units of %s.\n", medicineName[index]); 
+    displayFinalReport(order);
 
-            printf("New stock: %d\n", 
-
-                   medicineData[index][AVAILABLE_STOCK]); 
-
-            printf("Updated condition: %s\n", getCondition(index)); 
-
-        } 
-
-    } 
-
-  
-
-    index = searchMedicine("MED05"); 
-
-  
-
-    if (index != -1) 
-
-    { 
-
-        if (issueStock(&medicineData[index][AVAILABLE_STOCK], 40)) 
-
-        { 
-
-            printf("Issued 40 units of %s.\n", medicineName[index]); 
-
-            printf("New stock: %d\n", 
-
-                   medicineData[index][AVAILABLE_STOCK]); 
-
-            printf("Updated condition: %s\n", getCondition(index)); 
-
-        } 
-
-    } 
-
-} 
-
-  
-
-void displayFinalReport(int order[]) 
-
-{ 
-
-    int i, index; 
-
-    int reorderCount = 0; 
-
-    int urgentCount = 0; 
-
-    int expiryCount = 0; 
-
-  
-
-    printf("\n\n================ FINAL STOCK REPORT ================\n"); 
-
-    printf("%-6s %-15s %-7s %-10s %-7s %-5s %-20s %-8s\n", 
-
-           "Code", "Medicine", "Stock", "Coverage", 
-
-           "Expiry", "Ess.", "Condition", "Priority"); 
-
-  
-
-    for (i = 0; i < MEDICINE_COUNT; i++) 
-
-    { 
-
-        index = order[i]; 
-
-  
-
-        printf("%-6s %-15s %-7d %-10.2f %-7d %-5d %-20s %-8d\n", 
-
-               medicineCode[index], 
-
-               medicineName[index], 
-
-               medicineData[index][AVAILABLE_STOCK], 
-
-               calculateCoverage(index), 
-
-               medicineData[index][DAYS_TO_EXPIRY], 
-
-               medicineData[index][ESSENTIALITY], 
-
-               getCondition(index), 
-
-               i + 1); 
-
-  
-
-        if (shortageRisk(index)) 
-
-            reorderCount++; 
-
-  
-
-        if (conditionSeverity(index) == 1 || 
-
-            conditionSeverity(index) == 2) 
-
-            urgentCount++; 
-
-  
-
-        if (expiryRisk(index)) 
-
-            expiryCount++; 
-
-    } 
-
-  
-
-    printf("\nSummary\n"); 
-
-    printf("Total medicines analysed       : %d\n", MEDICINE_COUNT); 
-
-    printf("Number requiring reorder       : %d\n", reorderCount); 
-
-    printf("Number requiring urgent action : %d\n", urgentCount); 
-
-    printf("Number with expiry concern     : %d\n", expiryCount); 
-
-    printf("Highest management priority    : %s (%s)\n", 
-
-           medicineName[order[0]], medicineCode[order[0]]); 
-
-} 
-
-  
-
-int main(void) 
-
-{ 
-
-    int order[MEDICINE_COUNT]; 
-
-    int i; 
-
-  
-
-    for (i = 0; i < MEDICINE_COUNT; i++) 
-
-        order[i] = i; 
-
-  
-
-    printf("MEDICINE STOCK AND EXPIRY MANAGEMENT\n"); 
-
-    printf("Community Health Centre\n"); 
-
-  
-
-    printf("\n================ INITIAL ANALYSIS ================\n"); 
-
-  
-
-    for (i = 0; i < MEDICINE_COUNT; i++) 
-
-        displayMedicine(i); 
-
-  
-
-    demonstrateSearch("MED03"); 
-
-    demonstrateSearch("MED99"); 
-
-  
-
-    demonstrateUpdates(); 
-
-  
-
-    sortMedicineIndexes(order); 
-
-  
-
-    displayFinalReport(order); 
-
-  
-
-    return 0; 
-
+    return 0;
 }
